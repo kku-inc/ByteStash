@@ -16,7 +16,8 @@ import fs from 'fs';
 import Logger from './logger.js';
 
 const app = express();
-const PORT = 5000;
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
 app.set('trust proxy', true);
@@ -113,8 +114,8 @@ function handleShutdown() {
   await initializeDatabase();
 
   return new Promise((resolve) => {
-    app.listen(PORT, () => {
-      Logger.info(`Server running on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      Logger.info(`Server running on port ${HOST}:${PORT}`);
       resolve();
     });
   });

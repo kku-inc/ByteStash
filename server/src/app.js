@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import { initializeDatabase, shutdownDatabase } from './config/database.js';
 import snippetRoutes from './routes/snippetRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -13,6 +14,8 @@ import { authenticateApiKey } from './middleware/apiKeyAuth.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import swaggerUi from 'swagger-ui-express';
+import yaml from 'yamljs';
 import Logger from './logger.js';
 
 const app = express();
@@ -20,6 +23,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
+app.use(cookieParser());
 app.set('trust proxy', true);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,6 +32,10 @@ const __dirname = dirname(__filename);
 const basePath = process.env.BASE_PATH || '';
 const buildPath = join(__dirname, '../../client/build');
 const assetsPath = join(buildPath, 'assets');
+
+const swaggerPath = join(__dirname, '../docs/swagger.yaml');
+const swaggerDocument = yaml.load(swaggerPath);
+app.use(`${basePath}/api-docs`, swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(`${basePath}/api/auth`, authRoutes);
 app.use(`${basePath}/api/auth/oidc`, oidcRoutes);
@@ -75,6 +83,7 @@ app.get(`${basePath}/*`, (req, res, next) => {
 
   fs.readFile(join(buildPath, 'index.html'), 'utf8', (err, data) => {
     if (err) {
+      Logger.error('Failed to read index.html:', err)
       return res.status(500).send('Error loading index.html');
     }
 

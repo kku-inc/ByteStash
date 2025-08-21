@@ -6,5 +6,7 @@ export const ROUTES = {
   REGISTER: '/register',
   PUBLIC_SNIPPETS: '/public/snippets',
   AUTH_CALLBACK: '/auth/callback',
-  EMBED: '/embed/:shareId'
+  LOGOUT_CALLBACK: '/auth/logout_callback',
+  EMBED: '/embed/:shareId',
+  RECYCLE: '/recycle/snippets',
 } as const;

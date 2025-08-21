@@ -20,7 +20,7 @@ const SnippetCardMenu: React.FC<SnippetCardMenuProps> = ({
   onOpenInNewTab,
   onDuplicate,
   isPublicView,
-  isAuthenticated
+  isAuthenticated,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

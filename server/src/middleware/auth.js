@@ -21,6 +21,7 @@ const ALLOW_NEW_ACCOUNTS = process.env.ALLOW_NEW_ACCOUNTS === 'true';
 const TOKEN_EXPIRY = process.env.TOKEN_EXPIRY || '24h';
 const DISABLE_ACCOUNTS = process.env.DISABLE_ACCOUNTS === 'true';
 const DISABLE_INTERNAL_ACCOUNTS = process.env.DISABLE_INTERNAL_ACCOUNTS === 'true';
+const ALLOW_PASSWORD_CHANGES = process.env.ALLOW_PASSWORD_CHANGES === 'true';
 
 function generateAnonymousUsername() {
   return `anon-${crypto.randomBytes(8).toString('hex')}`;
@@ -53,8 +54,14 @@ const authenticateToken = async (req, res, next) => {
     }
   }
 
+  // Try to get token from header first (for API calls)
   const authHeader = req.headers['bytestashauth'];
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+
+  // If no header token, try to get from cookie (for browser access)
+  if (!token && req.cookies) {
+    token = req.cookies.bytestash_token;
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -76,5 +83,6 @@ export {
   ALLOW_NEW_ACCOUNTS, 
   DISABLE_ACCOUNTS,
   DISABLE_INTERNAL_ACCOUNTS,
-  getOrCreateAnonymousUser 
+  ALLOW_PASSWORD_CHANGES,
+  getOrCreateAnonymousUser,
 };

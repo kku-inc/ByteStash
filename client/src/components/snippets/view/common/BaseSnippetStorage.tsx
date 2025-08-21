@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeftToLine, Loader2 } from 'lucide-react';
 import { Snippet } from '../../../../types/snippets';
 import { getLanguageLabel } from '../../../../utils/language/languageUtils';
 import { SearchAndFilter } from '../../../search/SearchAndFilter';
 import SnippetList from '../../list/SnippetList';
 import SnippetModal from '../SnippetModal';
 import { PageContainer } from '../../../common/layout/PageContainer';
+import { useNavigate } from 'react-router-dom';
 import StorageHeader from './StorageHeader';
 
 interface BaseSnippetStorageProps {
@@ -23,11 +24,13 @@ interface BaseSnippetStorageProps {
   onSettingsOpen: () => void;
   onNewSnippet: () => void;
   onDelete?: (id: string) => Promise<void>;
+  onRestore?: (id: string) => Promise<void>;
   onEdit?: (snippet: Snippet) => void;
   onShare?: (snippet: Snippet) => void;
   onDuplicate?: (snippet: Snippet) => void;
   headerRight: React.ReactNode;
   isPublicView: boolean;
+  isRecycleView: boolean;
   isAuthenticated: boolean;
 }
 
@@ -46,11 +49,13 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
   onSettingsOpen,
   onNewSnippet,
   onDelete,
+  onRestore,
   onEdit,
   onShare,
   onDuplicate,
   headerRight,
   isPublicView,
+  isRecycleView,
   isAuthenticated
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,6 +63,7 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | null>(null);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha-asc' | 'alpha-desc'>('newest');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const navigate = useNavigate();
 
   const handleSearchTermChange = useCallback((term: string) => {
     setSearchTerm(term);
@@ -82,7 +88,7 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
     return Array.from(langSet).sort();
   }, [snippets]);
 
-  const allCategories = useMemo(() => 
+  const allCategories = useMemo(() =>
     [...new Set(snippets.flatMap(snippet => snippet.categories))].sort(),
     [snippets]
   );
@@ -93,21 +99,21 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
         snippet.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         snippet.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
-  
-      const fragmentMatch = snippet.fragments.some(fragment => 
+
+      const fragmentMatch = snippet.fragments.some(fragment =>
         fragment.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         getLanguageLabel(fragment.language).toLowerCase().includes(searchTerm.toLowerCase()) ||
         (includeCodeInSearch && fragment.code.toLowerCase().includes(searchTerm.toLowerCase()))
       );
-  
-      const languageMatch = selectedLanguage === '' || 
-        snippet.fragments.some(fragment => 
+
+      const languageMatch = selectedLanguage === '' ||
+        snippet.fragments.some(fragment =>
           getLanguageLabel(fragment.language).toLowerCase() === selectedLanguage.toLowerCase()
         );
-  
-      const categoryMatch = selectedCategories.length === 0 || 
+
+      const categoryMatch = selectedCategories.length === 0 ||
         selectedCategories.every(cat => snippet.categories.includes(cat));
-  
+
       return (basicMatch || fragmentMatch) && languageMatch && categoryMatch;
     }).sort((a, b) => {
       switch (sortOrder) {
@@ -150,7 +156,7 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
         <StorageHeader isPublicView={isPublicView} />
         {headerRight}
       </div>
-      
+
       <SearchAndFilter
         searchTerm={searchTerm}
         setSearchTerm={handleSearchTermChange}
@@ -167,8 +173,29 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
         selectedCategories={selectedCategories}
         onCategoryClick={handleCategoryClick}
         hideNewSnippet={isPublicView}
+        hideRecycleBin={isRecycleView}
       />
-      
+
+      {isRecycleView && (
+        <div className="mb-6 space-y-3">
+          <button 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-2 text-sm font-medium text-white hover:underline"
+          >
+            <ArrowLeftToLine size={18} /> Back to Snippets
+          </button>
+
+          <div className="text-sm text-light-text-primary dark:text-dark-text-secondary">
+            <h1 className="text-2xl font-semibold text-white">Recycle Bin</h1>
+            <p className="text-sm">
+              Snippets in the recycle bin will be permanently deleted after 30 days.
+            </p>
+          </div>
+        </div>
+      )}
+
+
+
       {selectedCategories.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4 items-center">
           <span className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Filtered by categories:</span>
@@ -184,12 +211,13 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
           ))}
         </div>
       )}
-      
+
       <SnippetList
         snippets={filteredSnippets}
         viewMode={viewMode}
         onOpen={openSnippet}
         onDelete={onDelete || (() => Promise.resolve())}
+        onRestore={onRestore || (() => Promise.resolve())} 
         onEdit={onEdit || (() => {})}
         onCategoryClick={handleCategoryClick}
         onShare={onShare || (() => {})}
@@ -201,15 +229,20 @@ const BaseSnippetStorage: React.FC<BaseSnippetStorageProps> = ({
         expandCategories={expandCategories}
         showLineNumbers={showLineNumbers}
         isPublicView={isPublicView}
+        isRecycleView={isRecycleView}
         isAuthenticated={isAuthenticated}
       />
 
       <SnippetModal
-        snippet={selectedSnippet} 
-        isOpen={!!selectedSnippet} 
+        snippet={selectedSnippet}
+        isOpen={!!selectedSnippet}
         onClose={closeSnippet}
+        onDelete={onDelete}
+        onEdit={onEdit}
         onCategoryClick={handleCategoryClick}
         showLineNumbers={showLineNumbers}
+        isPublicView={isPublicView}
+        isRecycleView={false}
       />
     </div>
   );

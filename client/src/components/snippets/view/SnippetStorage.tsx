@@ -1,31 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { useSnippets } from '../../../hooks/useSnippets';
-import { useSettings } from '../../../hooks/useSettings';
-import { useToast } from '../../../hooks/useToast';
-import { initializeMonaco } from '../../../utils/language/languageUtils';
-import EditSnippetModal from '../edit/EditSnippetModal';
-import SettingsModal from '../../settings/SettingsModal';
-import { ShareMenu } from '../share/ShareMenu';
-import { UserDropdown } from '../../auth/UserDropdown';
-import BaseSnippetStorage from './common/BaseSnippetStorage';
-import { Snippet } from '../../../types/snippets';
-import { useAuth } from '../../../hooks/useAuth';
+import React, { useState, useEffect } from "react";
+import { useSnippets } from "../../../hooks/useSnippets";
+import { useSettings } from "../../../hooks/useSettings";
+import { useToast } from "../../../hooks/useToast";
+import { initializeMonaco } from "../../../utils/language/languageUtils";
+import EditSnippetModal from "../edit/EditSnippetModal";
+import SettingsModal from "../../settings/SettingsModal";
+import { ShareMenu } from "../share/ShareMenu";
+import { UserDropdown } from "../../auth/UserDropdown";
+import BaseSnippetStorage from "./common/BaseSnippetStorage";
+import { Snippet } from "../../../types/snippets";
+import { useAuth } from "../../../hooks/useAuth";
+import { saveLanguagesUsage } from "../../../utils/language/languageUtils";
 
 const SnippetStorage: React.FC = () => {
-  const { 
-    snippets, 
-    isLoading, 
-    addSnippet, 
-    updateSnippet, 
-    removeSnippet, 
-    reloadSnippets 
+  const {
+    snippets,
+    isLoading,
+    addSnippet,
+    updateSnippet,
+    removeSnippet,
+    reloadSnippets,
+    pinSnippet,
+    favoriteSnippet,
   } = useSnippets();
-  
-  const { 
-    viewMode, setViewMode, compactView, showCodePreview, 
-    previewLines, includeCodeInSearch, updateSettings,
-    showCategories, expandCategories, showLineNumbers,
-    theme
+
+  const {
+    viewMode,
+    setViewMode,
+    compactView,
+    showCodePreview,
+    previewLines,
+    includeCodeInSearch,
+    updateSettings,
+    showCategories,
+    expandCategories,
+    showLineNumbers,
+    theme,
+    showFavorites,
+    setShowFavorites,
   } = useSettings();
 
   const { addToast } = useToast();
@@ -41,6 +53,12 @@ const SnippetStorage: React.FC = () => {
     initializeMonaco();
   }, []);
 
+  useEffect(() => {
+    if (snippets && snippets.length > 0) {
+      saveLanguagesUsage(snippets);
+    }
+  }, [snippets]);
+
   const openEditSnippetModal = (snippet: Snippet | null = null) => {
     setSnippetToEdit(snippet);
     setIsEditSnippetModalOpen(true);
@@ -51,7 +69,9 @@ const SnippetStorage: React.FC = () => {
     setIsEditSnippetModalOpen(false);
   };
 
-  const handleSnippetSubmit = async (snippetData: Omit<Snippet, 'id' | 'updated_at'>) => {
+  const handleSnippetSubmit = async (
+    snippetData: Omit<Snippet, "id" | "updated_at">
+  ) => {
     try {
       if (snippetToEdit) {
         await updateSnippet(snippetToEdit.id, snippetData);
@@ -61,7 +81,7 @@ const SnippetStorage: React.FC = () => {
       await reloadSnippets();
       closeEditSnippetModal();
     } catch (error) {
-      console.error('Error saving snippet:', error);
+      console.error("Error saving snippet:", error);
       throw error;
     }
   };
@@ -78,19 +98,36 @@ const SnippetStorage: React.FC = () => {
 
   const handleDuplicate = async (snippet: Snippet) => {
     try {
-      const duplicatedSnippet: Omit<Snippet, 'id' | 'updated_at' | 'share_count'> = {
+      const duplicatedSnippet: Omit<
+        Snippet,
+        "id" | "updated_at" | "share_count"
+      > = {
         title: `${snippet.title}`,
         description: snippet.description,
         categories: [...snippet.categories],
-        fragments: snippet.fragments.map(f => ({ ...f })),
-        is_public: snippet.is_public
+        fragments: snippet.fragments.map((f) => ({ ...f })),
+        is_public: snippet.is_public,
+        is_pinned: 0,
+        is_favorite: 0,
       };
-      
+
       await addSnippet(duplicatedSnippet);
     } catch (error) {
-      console.error('Failed to duplicate snippet:', error);
-      addToast('Failed to duplicate snippet', 'error');
+      console.error("Failed to duplicate snippet:", error);
+      addToast("Failed to duplicate snippet", "error");
     }
+  };
+
+  const handleShowFavorites = (): void => {
+    setShowFavorites((prev) => {
+      const newValue = !prev;
+      if (newValue) {
+        addToast("Displaying favorite snippets", "success");
+      } else {
+        addToast("Displaying all snippets", "info");
+      }
+      return newValue;
+    });
   };
 
   return (
@@ -117,6 +154,10 @@ const SnippetStorage: React.FC = () => {
         isPublicView={false}
         isRecycleView={false}
         isAuthenticated={isAuthenticated}
+        pinSnippet={pinSnippet}
+        favoriteSnippet={favoriteSnippet}
+        showFavorites={showFavorites}
+        handleShowFavorites={handleShowFavorites}
       />
 
       <EditSnippetModal
@@ -125,21 +166,23 @@ const SnippetStorage: React.FC = () => {
         onSubmit={handleSnippetSubmit}
         snippetToEdit={snippetToEdit}
         showLineNumbers={showLineNumbers}
-        allCategories={[...new Set(snippets.flatMap(snippet => snippet.categories))].sort()}
+        allCategories={[
+          ...new Set(snippets.flatMap((snippet) => snippet.categories)),
+        ].sort()}
       />
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
-        settings={{ 
-          compactView, 
-          showCodePreview, 
-          previewLines, 
-          includeCodeInSearch, 
-          showCategories, 
-          expandCategories, 
+        settings={{
+          compactView,
+          showCodePreview,
+          previewLines,
+          includeCodeInSearch,
+          showCategories,
+          expandCategories,
           showLineNumbers,
-          theme
+          theme,
         }}
         onSettingsChange={updateSettings}
         snippets={snippets}

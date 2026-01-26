@@ -130,6 +130,21 @@ const LANGUAGE_MAPPING: LanguageMapping = {
     monacoAlias: "csharp",
     label: "c#",
   },
+  vba: {
+    aliases: [
+      "vb",
+      "visualbasic",
+      "visual-basic",
+      "vbscript",
+      "vbs",
+      "excel-vba",
+      "word-vba",
+      "access-vba",
+      "office-vba",
+    ],
+    monacoAlias: "vb",
+    label: "vba",
+  },
   rust: {
     aliases: ["rs", "rust-lang", "rustlang", "cargo", "rustc"],
     monacoAlias: "rust",
@@ -327,9 +342,24 @@ const LANGUAGE_MAPPING: LanguageMapping = {
     label: "xml",
   },
   toml: {
-    aliases: ["ini", "conf", "config", "cargo.toml", "poetry.toml"],
+    aliases: ["cargo.toml", "poetry.toml"],
     monacoAlias: "ini",
     label: "toml",
+  },
+  ini: {
+    aliases: ["cfg", "properties", "config", "ini-file", "windows-ini"],
+    monacoAlias: "ini",
+    label: "ini",
+  },
+  conf: {
+    aliases: ["config-file", "configuration", "nginx", "apache", "httpd.conf"],
+    monacoAlias: "ini",
+    label: "conf",
+  },
+  vimscript: {
+    aliases: ["vim", "vimrc", ".vimrc", "viml", "nvim", "neovim"],
+    monacoAlias: "plaintext",
+    label: "vimscript",
   },
 
   // Cloud & Infrastructure

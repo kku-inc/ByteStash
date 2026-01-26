@@ -2,6 +2,7 @@ export const ROUTES = {
   HOME: '/',
   SHARED_SNIPPET: '/s/:shareId',
   SNIPPET: '/snippets/:snippetId',
+  SNIPPETS: '/snippets',
   LOGIN: '/login',
   REGISTER: '/register',
   PUBLIC_SNIPPETS: '/public/snippets',
@@ -9,4 +10,9 @@ export const ROUTES = {
   LOGOUT_CALLBACK: '/auth/logout_callback',
   EMBED: '/embed/:shareId',
   RECYCLE: '/recycle/snippets',
+  ADMIN: '/admin',
+  ADMIN_USERS: '/admin/users',
+  ADMIN_SNIPPETS: '/admin/snippets',
+  ADMIN_API_KEYS: '/admin/api-keys',
+  ADMIN_SHARES: '/admin/shares',
 } as const;

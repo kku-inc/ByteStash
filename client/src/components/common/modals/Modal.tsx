@@ -95,17 +95,6 @@ const Modal: React.FC<ModalProps> = ({
             {title}
           </div>
           <div className="flex items-center gap-2">
-            {expandable && (
-              <IconButton
-                icon={
-                  isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />
-                }
-                onClick={() => setIsExpanded(!isExpanded)}
-                variant="secondary"
-                size="sm"
-                label={isExpanded ? "Minimize" : "Maximize"}
-              />
-            )}
             {onEdit && (
               <IconButton
                 icon={<Pencil size={18} />}
@@ -124,12 +113,25 @@ const Modal: React.FC<ModalProps> = ({
                 label="Delete"
               />
             )}
-            <button
+            <div className="h-6 w-px bg-light-border dark:bg-dark-border mx-2" />
+            {expandable && (
+              <IconButton
+                icon={
+                  isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />
+                }
+                onClick={() => setIsExpanded(!isExpanded)}
+                variant="secondary"
+                size="sm"
+                label={isExpanded ? "Minimize" : "Maximize"}
+              />
+            )}
+            <IconButton
+              icon={<X size={20} />}
               onClick={onClose}
-              className="flex-shrink-0 transition-colors text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text"
-            >
-              <X size={24} />
-            </button>
+              variant="secondary"
+              size="sm"
+              label="Close"
+            />
           </div>
         </div>
 

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Clock,
   Users,
-  FileCode,
   ChevronLeft,
   ChevronRight,
   Globe,
@@ -18,7 +17,12 @@ import { ConfirmationModal } from "../../common/modals/ConfirmationModal";
 import { Snippet } from "../../../types/snippets";
 import CategoryList from "../../categories/CategoryList";
 import { PreviewCodeBlock } from "../../editor/PreviewCodeBlock";
-import { getUniqueLanguages } from "../../../utils/language/languageUtils";
+import {
+  getUniqueLanguages,
+  getFullFileName,
+  getFileIcon,
+} from "../../../utils/language/languageUtils";
+import { basePath } from "../../../utils/api/basePath";
 
 interface SnippetCardProps {
   snippet: Snippet;
@@ -128,7 +132,7 @@ export const SnippetCard: React.FC<SnippetCardProps> = ({
   };
 
   const handleOpenInNewTab = () => {
-    window.open(`/snippets/${snippet.id}`, "_blank");
+    window.open(`${basePath}/snippets/${snippet.id}`, "_blank");
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -190,7 +194,7 @@ export const SnippetCard: React.FC<SnippetCardProps> = ({
       <div
         className={`bg-light-surface dark:bg-dark-surface rounded-lg ${
           viewMode === "grid" ? "h-full" : "mb-4"
-        } 
+        }
           cursor-pointer hover:bg-light-hover dark:hover:bg-dark-hover transition-colors relative group`}
         onClick={() => {
           if (!isRecycleView) onOpen(snippet);
@@ -248,20 +252,21 @@ export const SnippetCard: React.FC<SnippetCardProps> = ({
               <h3
                 className={`${
                   compactView ? "text-lg" : "text-xl"
-                } font-bold text-light-text dark:text-dark-text 
+                } font-bold text-light-text dark:text-dark-text
                 truncate leading-normal mb-2`}
               >
                 {snippet.title}
               </h3>
 
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <div className="flex items-center gap-1 text-light-text-secondary dark:text-dark-text-secondary">
-                  <FileCode
-                    size={14}
-                    className="text-light-text-secondary dark:text-dark-text-secondary"
-                  />
-                  <span>{getUniqueLanguages(snippet.fragments)}</span>
-                </div>
+                {getUniqueLanguages(snippet.fragments) && (
+                  <div className="flex items-center gap-1 text-light-text-secondary dark:text-dark-text-secondary">
+                    <div className="shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                      {getFileIcon(snippet.fragments[0]?.file_name || "", snippet.fragments[0]?.language, "w-full h-full text-light-text-secondary dark:text-dark-text-secondary")}
+                    </div>
+                    <span>{getUniqueLanguages(snippet.fragments)}</span>
+                  </div>
+                )}
 
                 {snippet.username && isPublicView && (
                   <div className="flex items-center gap-1 text-light-text-secondary dark:text-dark-text-secondary">
@@ -302,11 +307,11 @@ export const SnippetCard: React.FC<SnippetCardProps> = ({
           </div>
 
           {!compactView && (
-            <p className="mb-3 text-sm text-light-text dark:text-dark-text line-clamp-1">
-              <ReactMarkdown className={`markdown prose max-w-none`}>
+            <div className="mb-3 text-sm text-light-text dark:text-dark-text line-clamp-2 overflow-hidden">
+              <ReactMarkdown className={`markdown prose dark:prose-invert max-w-none`}>
                 {snippet.description || translate('defaultDescription')}
               </ReactMarkdown>
-            </p>
+            </div>
           )}
 
           {showCategories && (
@@ -324,11 +329,10 @@ export const SnippetCard: React.FC<SnippetCardProps> = ({
             <div>
               <div className="flex items-center justify-between px-2 mb-1 text-xs rounded text-light-text-secondary dark:text-dark-text-secondary bg-light-hover/50 dark:bg-dark-hover/50 h-7">
                 <div className="flex items-center flex-1 min-w-0 gap-1">
-                  <FileCode
-                    size={12}
-                    className="text-light-text-secondary dark:text-dark-text-secondary shrink-0"
-                  />
-                  <span className="truncate">{currentFragment.file_name}</span>
+                  <div className="shrink-0 w-3 h-3 flex items-center justify-center">
+                    {getFileIcon(currentFragment.file_name, currentFragment.language, "w-full h-full text-light-text-secondary dark:text-dark-text-secondary")}
+                  </div>
+                  <span className="truncate">{getFullFileName(currentFragment.file_name, currentFragment.language)}</span>
                 </div>
                 <div className="flex items-center gap-0.5 ml-2">
                   {snippet.fragments.length > 1 ? (

@@ -1,0 +1,236 @@
+name: Security Pipeline
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  build-image:
+    name: Build image from source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Build image from this commit
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
+        with:
+          context: .
+          push: false
+          tags: bytestash:ci-${{ github.sha }}
+          platforms: linux/amd64
+          outputs: type=docker,dest=/tmp/bytestash-image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bytestash-ci-image
+          path: /tmp/bytestash-image.tar
+          retention-days: 1
+  # ---------- STATIC PHASE ----------
+  # Source-level scans. No running app. Run in parallel.
+
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Run Semgrep
+        run: semgrep ci
+        env:
+          SEMGREP_RULES: >-
+            p/javascript
+            p/typescript
+            p/react
+            p/nodejs
+            p/owasp-top-ten
+  trivy:
+    name: SCA (Trivy)
+    runs-on: ubuntu-latest
+    container:
+      image: aquasec/trivy:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Run Trivy filesystem scan
+        run: trivy fs --severity HIGH,CRITICAL --exit-code 1 --no-progress .
+  trivy-image:
+      name: Container Vulnerability Scan (Trivy)
+      runs-on: ubuntu-latest
+      needs: build-image
+      steps:
+        - name: Download image artifact
+          uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+          with:
+            name: bytestash-ci-image
+            path: /tmp
+
+        - name: Load image
+          run: docker load -i /tmp/bytestash-image.tar
+
+        - name: Scan the built image
+          run: |
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              aquasec/trivy:latest image \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              --no-progress \
+              bytestash:ci-${{ github.sha }}
+  gitleaks:
+    name: Secrets Detection (Gitleaks)
+    runs-on: ubuntu-latest
+    container:
+      image: zricethezav/gitleaks:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Run Gitleaks
+        run: gitleaks dir . --verbose --exit-code 1
+
+# ---------- DYNAMIC PHASE: deploy the hardened stack ----------
+  dynamic-testing:
+    name: DAST on Hardened Stack
+    runs-on: ubuntu-latest
+    needs: build-image
+    env:
+          BYTESTASH_IMAGE: bytestash:ci-${{ github.sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Download image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bytestash-ci-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load -i /tmp/bytestash-image.tar
+
+      - name: Confirm docker is available
+        run: docker version
+
+      - name: Generate ephemeral cert + secret, fix config perms
+        working-directory: ci
+        run: |
+          mkdir -p certs secrets
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout certs/bytestash.key -out certs/bytestash.crt \
+            -days 1 -subj "/CN=bytestash.local" \
+            -addext "subjectAltName=DNS:bytestash.local"
+          openssl rand -hex 32 > secrets/jwt_secret
+          chmod 644 certs/bytestash.key certs/bytestash.crt secrets/jwt_secret
+          chmod 644 nginx/default.conf.template nginx/bytestash_proxy.inc \
+                    modsec/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf
+
+      - name: Create and chown volumes
+        working-directory: ci
+        run: |
+          docker compose -f docker-compose.ci.yaml up --no-start
+          docker run --rm -v bytestashci_bytestash-data:/data alpine chown -R 1000:1000 /data
+          docker run --rm -v bytestashci_waf-logs:/logs alpine chown -R 101:101 /logs
+
+      - name: Bring up the hardened stack
+        working-directory: ci
+        run: docker compose -f docker-compose.ci.yaml up -d --wait
+
+      - name: Show status
+        working-directory: ci
+        run: docker compose -f docker-compose.ci.yaml ps
+
+      - name: Install test dependencies
+        working-directory: ci
+        run: pip install --quiet -r tests/requirements.txt
+
+      - name: Run Config Audit
+        working-directory: ci
+        run: pytest tests/test_config_audit.py -v
+
+      - name: Run Functionality Tests
+        working-directory: ci
+        run: pytest tests/test_functionality.py -v
+
+      - name: Run Security Tests
+        working-directory: ci
+        run: pytest tests/test_security.py -v
+
+      - name: Tear down
+        if: always()                    # guaranteed cleanup even on failure
+        working-directory: ci
+        run: docker compose -f docker-compose.ci.yaml down -v || true
+
+  # ------------ Create or Update a Github Issue if any security test fails -----------------
+
+  notify-issue:
+      name: Notify (GitHub Issue)
+      runs-on: ubuntu-latest
+      needs: [build-image, semgrep, trivy, trivy-image, gitleaks, dynamic-testing]
+      if: ${{ always() && vars.NOTIFY_ISSUE == 'true' }}
+      permissions:
+        issues: write
+      steps:
+        - name: Open an issue if any security job failed
+          env:
+            GH_TOKEN: ${{ github.token }}
+            REPO: ${{ github.repository }}
+            RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            RESULTS: |
+              build=${{ needs.build-image.result }}
+              semgrep=${{ needs.semgrep.result }}
+              trivy=${{ needs.trivy.result }}
+              trivy-image=${{ needs.trivy-image.result }}
+              gitleaks=${{ needs.gitleaks.result }}
+              dynamic=${{ needs.dynamic-testing.result }}
+          run: |
+            # did anything fail?
+            if ! echo "$RESULTS" | grep -q "failure"; then
+              echo "No failures; nothing to notify."
+              exit 0
+            fi
+
+            # ensure the label exists (idempotent; --force = no error if present)
+            gh label create "security-pipeline" \
+              --repo "$REPO" \
+              --color "B60205" \
+              --description "Findings reported by the security pipeline" \
+              --force
+
+            # dedupe: skip if an open pipeline issue already exists
+            existing=$(gh issue list --repo "$REPO" --state open \
+                                     --label "security-pipeline" --json number --jq '.[0].number // empty')
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$REPO" \
+                --body "Security pipeline failed again on a later run.
+
+            Results:
+            \`\`\`
+            $RESULTS
+            \`\`\`
+
+            Full run: $RUN_URL"
+              echo "Commented on existing issue #$existing."
+            else
+              gh issue create --repo "$REPO" \
+                --title "Security pipeline: findings detected" \
+                --label "security-pipeline" \
+                --body "The security pipeline reported one or more findings.
+
+            Results:
+            \`\`\`
+            $RESULTS
+            \`\`\`
+
+            Full run: $RUN_URL"
+              echo "Created a new issue."
+            fi

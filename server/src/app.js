@@ -9,6 +9,7 @@ import oidcRoutes from "./routes/oidcRoutes.js";
 import embedRoutes from "./routes/embedRoutes.js";
 import apiKeyRoutes from "./routes/apiKeyRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
 import mcpRoutes from "./routes/mcpRoutes.js";
 import { authenticateToken } from "./middleware/auth.js";
 import { authenticateApiKey } from "./middleware/apiKeyAuth.js";
@@ -18,7 +19,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import fs from "fs";
 import swaggerUi from "swagger-ui-express";
-import yaml from "yamljs";
+import YAML from "yaml";
 import Logger from "./logger.js";
 
 const app = express();
@@ -37,7 +38,7 @@ const buildPath = join(__dirname, "../../client/build");
 const assetsPath = join(buildPath, "assets");
 
 const swaggerPath = join(__dirname, "../docs/swagger.yaml");
-const swaggerDocument = yaml.load(swaggerPath);
+const swaggerDocument = YAML.parse(fs.readFileSync(swaggerPath, "utf8"));
 app.use(
   `${basePath}/api-docs`,
   swaggerUi.serve,
@@ -47,6 +48,7 @@ app.use(
 app.use(`${basePath}/api/auth`, authRoutes);
 app.use(`${basePath}/api/auth/oidc`, oidcRoutes);
 app.use(`${basePath}/api/keys`, authenticateToken, apiKeyRoutes);
+app.use(`${basePath}/api/settings`, authenticateToken, settingsRoutes);
 app.use(
   `${basePath}/api/snippets`,
   authenticateApiKey,

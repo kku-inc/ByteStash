@@ -24,7 +24,8 @@ import Logger from "./logger.js";
 import { OIDCConfig } from "./oidc/oidcConfig.js";
 
 const app = express();
-const PORT = 5000;
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT || 5000;
 
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
@@ -159,8 +160,8 @@ async function handleShutdown() {
   }
 
   return new Promise((resolve) => {
-    app.listen(PORT, () => {
-      Logger.info(`Server running on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      Logger.info(`Server running on ${HOST}:${PORT}`);
       OIDCConfig.getInstance().catch(() => {});
       resolve();
     });
